@@ -21,7 +21,7 @@ import subprocess
 import syslog as sl
 
 from vyos.config import Config
-from vyos.util import vyos
+from vyos import ConfigError
 
 
 def get_config():
@@ -31,7 +31,7 @@ def get_config():
         # skip interfaces that are disabled or is configured for dhcp
         check_disable = "interfaces ethernet {} disable".format(intf)
         check_dhcp = "interfaces ethernet {} address dhcp".format(intf)
-        if c.exists_effective(check_disable) or c.exists_effective(check_dhcp):
+        if c.exists_effective(check_disable):
             continue
 
         # get addresses configured on the interface
@@ -51,7 +51,10 @@ def apply(config):
 
         # add configured addresses to interface
         for addr in addresses:
-            cmd = ["ip", "address", "add", addr, "dev", intf]
+            if addr == "dhcp":
+                cmd = ["dhclient", intf]
+            else:
+                cmd = ["ip", "address", "add", addr, "dev", intf]
             sl.syslog(sl.LOG_NOTICE, " ".join(cmd))
             subprocess.call(cmd)
 
@@ -60,6 +63,6 @@ if __name__ == '__main__':
     try:
         config = get_config()
         apply(config)
-    except vyos.ConfigError as e:
+    except ConfigError as e:
         print(e)
         sys.exit(1)
